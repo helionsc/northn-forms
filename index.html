@@ -1,0 +1,558 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Northn Forms — Construtor de Formulários</title>
+<style>
+:root{
+  --bg:#f4f5f7; --panel:#ffffff; --border:#e4e6eb; --text:#1c1c1e; --muted:#6b7280;
+  --accent:#6a5bff; --accent-soft:#efedff; --danger:#e5484d; --radius:14px;
+}
+*{box-sizing:border-box}
+body{margin:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Inter,sans-serif;background:var(--bg);color:var(--text);}
+header{padding:18px 24px;background:var(--panel);border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:10;}
+header h1{font-size:17px;margin:0;font-weight:700;}
+header h1 span{color:var(--accent);}
+header p{margin:2px 0 0;font-size:12.5px;color:var(--muted);}
+.btn-export{background:var(--accent);color:#fff;border:none;padding:11px 20px;border-radius:10px;font-size:14px;font-weight:650;cursor:pointer;}
+.btn-export:hover{opacity:.92}
+.layout{display:flex;gap:0;height:calc(100vh - 65px);}
+.editor{width:420px;min-width:340px;overflow-y:auto;padding:20px;border-right:1px solid var(--border);background:var(--panel);}
+.preview-wrap{flex:1;background:#e9eaed;display:flex;align-items:center;justify-content:center;padding:24px;overflow:auto;}
+.preview-frame{width:100%;max-width:880px;height:100%;border:none;border-radius:16px;box-shadow:0 8px 30px rgba(0,0,0,.12);background:#fff;}
+
+.section{margin-bottom:22px;}
+.section h2{font-size:12.5px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);margin:0 0 10px;font-weight:700;}
+.field{margin-bottom:12px;}
+.field label{display:block;font-size:12.5px;font-weight:600;color:var(--text);margin-bottom:5px;}
+.field input[type=text],.field input[type=url],.field textarea,.field select{
+  width:100%;padding:9px 11px;border-radius:9px;border:1.5px solid var(--border);font-size:13.5px;font-family:inherit;background:#fbfbfc;
+}
+.field input:focus,.field textarea:focus,.field select:focus{outline:none;border-color:var(--accent);background:#fff;}
+.field textarea{resize:vertical;min-height:56px;}
+.row2{display:flex;gap:10px;}
+.row2 .field{flex:1;}
+.color-row{display:flex;align-items:center;gap:10px;}
+.color-row input[type=color]{width:40px;height:34px;border:none;border-radius:8px;cursor:pointer;background:none;padding:0;}
+.color-row span{font-size:12.5px;color:var(--muted);}
+.hint{font-size:11.5px;color:var(--muted);margin-top:4px;line-height:1.4;}
+
+.question-card{border:1.5px solid var(--border);border-radius:12px;padding:14px;margin-bottom:12px;background:#fbfbfc;}
+.question-card .qhead{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;}
+.question-card .qhead b{font-size:12.5px;color:var(--muted);}
+.qactions{display:flex;gap:6px;}
+.qactions button{border:none;background:var(--border);width:26px;height:26px;border-radius:7px;cursor:pointer;font-size:13px;color:var(--text);}
+.qactions button.remove{background:#fde8e8;color:var(--danger);}
+.qactions button:hover{opacity:.8}
+.checkbox-row{display:flex;align-items:center;gap:7px;margin-top:4px;}
+.checkbox-row input{width:15px;height:15px;}
+.checkbox-row label{font-size:12.5px;margin:0;font-weight:600;}
+
+.btn-add{width:100%;padding:11px;border:1.5px dashed var(--accent);background:var(--accent-soft);color:var(--accent);border-radius:10px;font-weight:650;cursor:pointer;font-size:13.5px;}
+.btn-add:hover{opacity:.85}
+
+.integ-note{background:#fff7e6;border:1px solid #ffe0a3;border-radius:10px;padding:10px 12px;font-size:12px;color:#7a5b00;margin-bottom:12px;line-height:1.5;}
+
+@media (max-width: 860px){
+  .layout{flex-direction:column;height:auto;}
+  .editor{width:100%;border-right:none;border-bottom:1px solid var(--border);}
+  .preview-wrap{height:640px;}
+}
+</style>
+</head>
+<body>
+
+<header>
+  <div>
+    <h1><span>Northn</span> Forms — Construtor</h1>
+    <p>Monte, personalize e exporte o formulário em HTML pronto para publicar</p>
+  </div>
+  <button class="btn-export" id="btnExportar">Baixar formulário (HTML)</button>
+</header>
+
+<div class="layout">
+  <aside class="editor" id="editor"></aside>
+  <main class="preview-wrap">
+    <iframe class="preview-frame" id="previewFrame"></iframe>
+  </main>
+</div>
+
+<script>
+// ---------------------------------------------------------------
+// Estado
+// ---------------------------------------------------------------
+let CONFIG = {
+  marca: {
+    corPrimaria: '#F27783',
+    corSecundaria: '#B9D96A',
+    emoji: '🌿',
+    organizacao: 'Sua Organização',
+  },
+  titulo: 'Título do formulário',
+  descricao: 'Escreva aqui uma breve descrição de boas-vindas para quem for preencher o formulário.',
+  textoBotao: 'Enviar',
+  mensagemSucesso: 'Recebemos sua resposta! Obrigado por preencher.',
+  emailjs: { publicKey: '', serviceId: '', templateId: '' },
+  webhookUrl: '',
+  perguntas: [
+    { id: cryptoId(), tipo: 'texto', label: 'Nome completo', obrigatoria: true, opcoes: [] },
+    { id: cryptoId(), tipo: 'email', label: 'E-mail', obrigatoria: true, opcoes: [] },
+    { id: cryptoId(), tipo: 'radio', label: 'Como você conheceu a gente?', obrigatoria: true, opcoes: ['Instagram', 'Indicação de amigo(a)', 'Outro'] },
+  ],
+};
+
+function cryptoId() {
+  return 'q' + Math.random().toString(36).slice(2, 9);
+}
+
+const TIPOS = [
+  { v: 'texto', l: 'Texto curto' },
+  { v: 'textoLongo', l: 'Texto longo' },
+  { v: 'email', l: 'E-mail' },
+  { v: 'telefone', l: 'Telefone' },
+  { v: 'radio', l: 'Múltipla escolha (uma resposta)' },
+  { v: 'checkbox', l: 'Caixas de seleção (várias respostas)' },
+  { v: 'lista', l: 'Lista suspensa' },
+];
+
+function precisaOpcoes(tipo) {
+  return tipo === 'radio' || tipo === 'checkbox' || tipo === 'lista';
+}
+
+// ---------------------------------------------------------------
+// Editor (painel esquerdo)
+// ---------------------------------------------------------------
+function renderEditor() {
+  const el = document.getElementById('editor');
+  el.innerHTML = `
+    <div class="section">
+      <h2>Marca</h2>
+      <div class="row2">
+        <div class="field">
+          <label>Cor principal</label>
+          <div class="color-row"><input type="color" id="corPrimaria" value="${CONFIG.marca.corPrimaria}"><span>${CONFIG.marca.corPrimaria}</span></div>
+        </div>
+        <div class="field">
+          <label>Cor secundária</label>
+          <div class="color-row"><input type="color" id="corSecundaria" value="${CONFIG.marca.corSecundaria}"><span>${CONFIG.marca.corSecundaria}</span></div>
+        </div>
+      </div>
+      <div class="row2">
+        <div class="field">
+          <label>Ícone / emoji do logo</label>
+          <input type="text" id="emoji" value="${escapeAttr(CONFIG.marca.emoji)}" maxlength="4">
+        </div>
+        <div class="field">
+          <label>Nome da organização</label>
+          <input type="text" id="organizacao" value="${escapeAttr(CONFIG.marca.organizacao)}">
+        </div>
+      </div>
+    </div>
+
+    <div class="section">
+      <h2>Textos</h2>
+      <div class="field">
+        <label>Título do formulário</label>
+        <input type="text" id="titulo" value="${escapeAttr(CONFIG.titulo)}">
+      </div>
+      <div class="field">
+        <label>Descrição / boas-vindas</label>
+        <textarea id="descricao">${escapeHtml(CONFIG.descricao)}</textarea>
+      </div>
+      <div class="row2">
+        <div class="field">
+          <label>Texto do botão</label>
+          <input type="text" id="textoBotao" value="${escapeAttr(CONFIG.textoBotao)}">
+        </div>
+        <div class="field">
+          <label>Mensagem de sucesso</label>
+          <input type="text" id="mensagemSucesso" value="${escapeAttr(CONFIG.mensagemSucesso)}">
+        </div>
+      </div>
+    </div>
+
+    <div class="section">
+      <h2>Perguntas</h2>
+      <div id="perguntasList"></div>
+      <button class="btn-add" id="btnAddPergunta">+ Adicionar pergunta</button>
+    </div>
+
+    <div class="section">
+      <h2>Envio das respostas</h2>
+      <div class="integ-note">Opcional. Sem isso, o formulário mostra a mensagem de sucesso mas não envia os dados pra lugar nenhum. Configure pelo menos uma opção abaixo antes de publicar de verdade.</div>
+      <div class="field">
+        <label>Webhook URL (recebe um POST em JSON)</label>
+        <input type="url" id="webhookUrl" placeholder="https://..." value="${escapeAttr(CONFIG.webhookUrl)}">
+      </div>
+      <div class="field"><label>EmailJS — Public Key</label><input type="text" id="ejPublicKey" value="${escapeAttr(CONFIG.emailjs.publicKey)}"></div>
+      <div class="row2">
+        <div class="field"><label>EmailJS — Service ID</label><input type="text" id="ejServiceId" value="${escapeAttr(CONFIG.emailjs.serviceId)}"></div>
+        <div class="field"><label>EmailJS — Template ID</label><input type="text" id="ejTemplateId" value="${escapeAttr(CONFIG.emailjs.templateId)}"></div>
+      </div>
+      <div class="hint">No template do EmailJS use as variáveis <b>{{resumo}}</b>, <b>{{data}}</b> e <b>{{hora}}</b> pra exibir todas as respostas.</div>
+    </div>
+  `;
+
+  renderPerguntas();
+  wireCamposGerais();
+}
+
+function renderPerguntas() {
+  const list = document.getElementById('perguntasList');
+  list.innerHTML = CONFIG.perguntas.map((p, i) => `
+    <div class="question-card" data-id="${p.id}">
+      <div class="qhead">
+        <b>Pergunta ${i + 1}</b>
+        <div class="qactions">
+          <button data-action="up" title="Mover pra cima">↑</button>
+          <button data-action="down" title="Mover pra baixo">↓</button>
+          <button data-action="remove" class="remove" title="Remover">✕</button>
+        </div>
+      </div>
+      <div class="field">
+        <label>Texto da pergunta</label>
+        <input type="text" data-field="label" value="${escapeAttr(p.label)}">
+      </div>
+      <div class="field">
+        <label>Tipo de resposta</label>
+        <select data-field="tipo">
+          ${TIPOS.map(t => `<option value="${t.v}" ${t.v === p.tipo ? 'selected' : ''}>${t.l}</option>`).join('')}
+        </select>
+      </div>
+      ${precisaOpcoes(p.tipo) ? `
+        <div class="field">
+          <label>Opções (uma por linha)</label>
+          <textarea data-field="opcoes">${escapeHtml((p.opcoes || []).join('\n'))}</textarea>
+        </div>
+      ` : ''}
+      <div class="checkbox-row">
+        <input type="checkbox" data-field="obrigatoria" ${p.obrigatoria ? 'checked' : ''} id="obg-${p.id}">
+        <label for="obg-${p.id}">Resposta obrigatória</label>
+      </div>
+    </div>
+  `).join('');
+
+  list.querySelectorAll('.question-card').forEach(card => {
+    const id = card.dataset.id;
+    const pergunta = CONFIG.perguntas.find(p => p.id === id);
+
+    card.querySelector('[data-field="label"]').addEventListener('input', e => {
+      pergunta.label = e.target.value;
+      atualizarPreview();
+    });
+    card.querySelector('[data-field="tipo"]').addEventListener('change', e => {
+      pergunta.tipo = e.target.value;
+      if (precisaOpcoes(pergunta.tipo) && (!pergunta.opcoes || !pergunta.opcoes.length)) {
+        pergunta.opcoes = ['Opção 1', 'Opção 2'];
+      }
+      renderPerguntas();
+      atualizarPreview();
+    });
+    const opcoesField = card.querySelector('[data-field="opcoes"]');
+    if (opcoesField) {
+      opcoesField.addEventListener('input', e => {
+        pergunta.opcoes = e.target.value.split('\n').map(s => s.trim()).filter(Boolean);
+        atualizarPreview();
+      });
+    }
+    card.querySelector('[data-field="obrigatoria"]').addEventListener('change', e => {
+      pergunta.obrigatoria = e.target.checked;
+      atualizarPreview();
+    });
+    card.querySelector('[data-action="remove"]').addEventListener('click', () => {
+      CONFIG.perguntas = CONFIG.perguntas.filter(p => p.id !== id);
+      renderPerguntas();
+      atualizarPreview();
+    });
+    card.querySelector('[data-action="up"]').addEventListener('click', () => {
+      const idx = CONFIG.perguntas.findIndex(p => p.id === id);
+      if (idx > 0) {
+        [CONFIG.perguntas[idx - 1], CONFIG.perguntas[idx]] = [CONFIG.perguntas[idx], CONFIG.perguntas[idx - 1]];
+        renderPerguntas();
+        atualizarPreview();
+      }
+    });
+    card.querySelector('[data-action="down"]').addEventListener('click', () => {
+      const idx = CONFIG.perguntas.findIndex(p => p.id === id);
+      if (idx < CONFIG.perguntas.length - 1) {
+        [CONFIG.perguntas[idx + 1], CONFIG.perguntas[idx]] = [CONFIG.perguntas[idx], CONFIG.perguntas[idx + 1]];
+        renderPerguntas();
+        atualizarPreview();
+      }
+    });
+  });
+
+  document.getElementById('btnAddPergunta').onclick = () => {
+    CONFIG.perguntas.push({ id: cryptoId(), tipo: 'texto', label: 'Nova pergunta', obrigatoria: false, opcoes: [] });
+    renderPerguntas();
+    atualizarPreview();
+  };
+}
+
+function wireCamposGerais() {
+  const bind = (id, path, isCheckbox) => {
+    const el = document.getElementById(id);
+    el.addEventListener('input', () => {
+      const val = isCheckbox ? el.checked : el.value;
+      setByPath(CONFIG, path, val);
+      if (id === 'corPrimaria' || id === 'corSecundaria') el.nextElementSibling.textContent = val;
+      atualizarPreview();
+    });
+  };
+  bind('corPrimaria', 'marca.corPrimaria');
+  bind('corSecundaria', 'marca.corSecundaria');
+  bind('emoji', 'marca.emoji');
+  bind('organizacao', 'marca.organizacao');
+  bind('titulo', 'titulo');
+  bind('descricao', 'descricao');
+  bind('textoBotao', 'textoBotao');
+  bind('mensagemSucesso', 'mensagemSucesso');
+  bind('webhookUrl', 'webhookUrl');
+  bind('ejPublicKey', 'emailjs.publicKey');
+  bind('ejServiceId', 'emailjs.serviceId');
+  bind('ejTemplateId', 'emailjs.templateId');
+}
+
+function setByPath(obj, path, val) {
+  const parts = path.split('.');
+  let ref = obj;
+  for (let i = 0; i < parts.length - 1; i++) ref = ref[parts[i]];
+  ref[parts[parts.length - 1]] = val;
+}
+
+function escapeHtml(s) {
+  return String(s || '').replace(/[&<>]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
+}
+function escapeAttr(s) {
+  return String(s || '').replace(/"/g, '&quot;');
+}
+
+// ---------------------------------------------------------------
+// Geração do formulário final (usada no preview E na exportação)
+// ---------------------------------------------------------------
+function gerarHTML(cfg) {
+  const perguntasJson = JSON.stringify(cfg.perguntas);
+  const cfgJson = JSON.stringify(cfg);
+
+  return `<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>${escapeHtml(cfg.titulo)}</title>
+<script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"><\/script>
+<style>
+:root{ --p:${cfg.marca.corPrimaria}; --s:${cfg.marca.corSecundaria}; --dark:#3f3f46; --bg:#fafaf9; }
+*{box-sizing:border-box}
+body{margin:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;color:var(--dark);
+  background:
+    radial-gradient(circle at top right, color-mix(in srgb, var(--p) 22%, transparent), transparent 35%),
+    radial-gradient(circle at bottom left, color-mix(in srgb, var(--s) 28%, transparent), transparent 35%), var(--bg);
+}
+.container{max-width:760px;margin:36px auto;padding:20px;}
+.card{background:rgba(255,255,255,.8);backdrop-filter:blur(16px);border-radius:26px;padding:30px;box-shadow:0 15px 40px rgba(0,0,0,.08);}
+.logo{text-align:center;margin-bottom:6px;}
+.badge{display:inline-block;background:color-mix(in srgb, var(--p) 12%, white);border:1px solid color-mix(in srgb, var(--p) 30%, white);padding:7px 16px;border-radius:999px;font-size:13px;font-weight:600;}
+h1{margin:14px 0 6px;font-size:1.7rem;text-align:center;}
+.desc{text-align:center;color:#666;margin:0 0 22px;line-height:1.5;}
+.q{margin-bottom:20px;opacity:0;transform:translateY(16px);animation:up .5s ease forwards;}
+@keyframes up{to{opacity:1;transform:none}}
+.q label.qlabel{display:block;font-weight:650;margin-bottom:8px;font-size:15px;}
+.q label.qlabel .req{color:var(--p);margin-left:2px;}
+input[type=text],input[type=email],input[type=tel],textarea,select{
+  width:100%;padding:13px 14px;border-radius:14px;border:2px solid #eee;font-size:15px;font-family:inherit;transition:.2s;background:#fff;
+}
+input:focus,textarea:focus,select:focus{border-color:var(--s);outline:none;}
+textarea{min-height:90px;resize:vertical;}
+.option{display:block;padding:12px 16px;margin:8px 0;border-radius:16px;background:#fff;cursor:pointer;transition:.2s;border:1.5px solid #eee;font-size:14.5px;}
+.option:hover{transform:translateY(-1px);border-color:var(--p);}
+.option input{margin-right:8px;}
+button.submit{width:100%;padding:17px;border:none;border-radius:16px;background:linear-gradient(90deg,var(--p),var(--s));font-size:17px;font-weight:700;color:#fff;cursor:pointer;transition:.2s;margin-top:6px;}
+button.submit:hover{transform:scale(1.015);}
+button.submit:disabled{opacity:.6;cursor:not-allowed;transform:none;}
+#statusMsg{display:none;padding:26px;border-radius:16px;margin-bottom:18px;font-weight:600;text-align:center;font-size:1.05rem;}
+#statusMsg.success{background:#eaf7ea;color:#2a7a2a;border:1px solid var(--s);display:block;}
+#statusMsg.error{background:#fdeaea;color:#a02525;border:1px solid #f27783;display:block;}
+#statusMsg.loading{background:#fff7ef;color:#a05a25;border:1px solid #f2c777;display:block;}
+form.hidden{display:none;}
+footer{text-align:center;font-size:.82rem;color:#999;margin-top:16px;}
+</style>
+</head>
+<body>
+<div class="container">
+  <div class="card">
+    <div class="logo">
+      <span class="badge">${escapeHtml(cfg.marca.emoji)} ${escapeHtml(cfg.marca.organizacao)}</span>
+    </div>
+    <h1>${escapeHtml(cfg.titulo)}</h1>
+    <p class="desc">${escapeHtml(cfg.descricao)}</p>
+
+    <div id="statusMsg"></div>
+
+    <form id="form"></form>
+
+    <footer>${escapeHtml(cfg.marca.organizacao)}</footer>
+  </div>
+</div>
+
+<script>
+(function(){
+  const CFG = ${cfgJson};
+  const PERGUNTAS = ${perguntasJson};
+  const form = document.getElementById('form');
+  const statusMsg = document.getElementById('statusMsg');
+
+  function setStatus(text, type){ statusMsg.textContent = text; statusMsg.className = type; }
+
+  PERGUNTAS.forEach((p, i) => {
+    const wrap = document.createElement('div');
+    wrap.className = 'q';
+    wrap.style.animationDelay = (i * 0.07) + 's';
+    const req = p.obrigatoria ? '<span class="req">*</span>' : '';
+    let inner = '<label class="qlabel">' + p.label + req + '</label>';
+
+    if (p.tipo === 'texto') {
+      inner += '<input type="text" data-q="' + p.id + '" ' + (p.obrigatoria ? 'required' : '') + '>';
+    } else if (p.tipo === 'email') {
+      inner += '<input type="email" data-q="' + p.id + '" ' + (p.obrigatoria ? 'required' : '') + '>';
+    } else if (p.tipo === 'telefone') {
+      inner += '<input type="tel" data-q="' + p.id + '" placeholder="(00) 00000-0000" maxlength="15" inputmode="numeric" ' + (p.obrigatoria ? 'required' : '') + '>';
+    } else if (p.tipo === 'textoLongo') {
+      inner += '<textarea data-q="' + p.id + '" ' + (p.obrigatoria ? 'required' : '') + '></textarea>';
+    } else if (p.tipo === 'radio') {
+      inner += (p.opcoes || []).map(function(op, oi){
+        return '<label class="option"><input type="radio" name="' + p.id + '" value="' + op.replace(/"/g,'&quot;') + '" ' + (p.obrigatoria && oi === 0 ? 'required' : '') + '> ' + op + '</label>';
+      }).join('');
+    } else if (p.tipo === 'checkbox') {
+      inner += (p.opcoes || []).map(function(op){
+        return '<label class="option"><input type="checkbox" data-q="' + p.id + '" value="' + op.replace(/"/g,'&quot;') + '"> ' + op + '</label>';
+      }).join('');
+    } else if (p.tipo === 'lista') {
+      inner += '<select data-q="' + p.id + '" ' + (p.obrigatoria ? 'required' : '') + '><option value="">Selecione...</option>' +
+        (p.opcoes || []).map(function(op){ return '<option value="' + op.replace(/"/g,'&quot;') + '">' + op + '</option>'; }).join('') +
+        '</select>';
+    }
+    wrap.innerHTML = inner;
+    form.appendChild(wrap);
+  });
+
+  const btn = document.createElement('button');
+  btn.type = 'submit';
+  btn.className = 'submit';
+  btn.textContent = CFG.textoBotao;
+  form.appendChild(btn);
+
+  form.querySelectorAll('input[type=tel]').forEach(function(tel){
+    tel.addEventListener('input', function(e){
+      let v = e.target.value.replace(/\\D/g,'').slice(0,11);
+      if (v.length > 0) v = '(' + v;
+      if (v.length > 3) v = v.slice(0,3) + ') ' + v.slice(3);
+      if (v.length > 10) v = v.slice(0,10) + '-' + v.slice(10);
+      e.target.value = v;
+    });
+  });
+
+  form.onsubmit = function(e){
+    e.preventDefault();
+
+    const respostas = {};
+    const linhasResumo = [];
+    let faltaObrigatoria = false;
+
+    PERGUNTAS.forEach(function(p){
+      let valor = '';
+      if (p.tipo === 'radio') {
+        const sel = form.querySelector('input[name="' + p.id + '"]:checked');
+        valor = sel ? sel.value : '';
+        if (p.obrigatoria && !valor) faltaObrigatoria = true;
+      } else if (p.tipo === 'checkbox') {
+        const checked = Array.from(form.querySelectorAll('input[data-q="' + p.id + '"]:checked')).map(function(c){ return c.value; });
+        valor = checked.join(', ');
+        if (p.obrigatoria && checked.length === 0) faltaObrigatoria = true;
+      } else {
+        const campo = form.querySelector('[data-q="' + p.id + '"]');
+        valor = campo ? campo.value.trim() : '';
+        if (p.obrigatoria && !valor) faltaObrigatoria = true;
+      }
+      respostas[p.label] = valor;
+      linhasResumo.push(p.label + ': ' + (valor || '—'));
+    });
+
+    if (faltaObrigatoria) {
+      setStatus('Preencha todos os campos obrigatórios antes de enviar.', 'error');
+      return;
+    }
+
+    const now = new Date();
+    const data = now.toLocaleDateString('pt-BR');
+    const hora = now.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+    const resumo = linhasResumo.join('\\n');
+
+    btn.disabled = true;
+    btn.textContent = 'Enviando...';
+    form.classList.add('hidden');
+    setStatus('Enviando, aguarde...', 'loading');
+
+    const promessas = [];
+
+    if (CFG.emailjs && CFG.emailjs.serviceId && CFG.emailjs.templateId && CFG.emailjs.publicKey) {
+      emailjs.init({ publicKey: CFG.emailjs.publicKey });
+      promessas.push(emailjs.send(CFG.emailjs.serviceId, CFG.emailjs.templateId, { resumo: resumo, data: data, hora: hora, respostas_json: JSON.stringify(respostas) }));
+    }
+    if (CFG.webhookUrl) {
+      promessas.push(fetch(CFG.webhookUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ respostas: respostas, resumo: resumo, data: data, hora: hora }),
+      }));
+    }
+
+    Promise.all(promessas)
+      .then(function(){ setStatus(CFG.mensagemSucesso, 'success'); })
+      .catch(function(err){
+        console.error('Erro ao enviar:', err);
+        setStatus('Ocorreu um erro ao enviar. Tente novamente em instantes.', 'error');
+        form.classList.remove('hidden');
+        btn.disabled = false;
+        btn.textContent = CFG.textoBotao;
+      });
+
+    if (promessas.length === 0) {
+      setStatus(CFG.mensagemSucesso, 'success');
+    }
+  };
+})();
+<\/script>
+</body>
+</html>`;
+}
+
+// ---------------------------------------------------------------
+// Preview + Exportação
+// ---------------------------------------------------------------
+function atualizarPreview() {
+  document.getElementById('previewFrame').srcdoc = gerarHTML(CONFIG);
+}
+
+function baixarHTML() {
+  const html = gerarHTML(CONFIG);
+  const blob = new Blob([html], { type: 'text/html' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  const nomeArquivo = (CONFIG.titulo || 'formulario').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '') || 'formulario';
+  a.download = nomeArquivo + '.html';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+document.getElementById('btnExportar').addEventListener('click', baixarHTML);
+
+renderEditor();
+atualizarPreview();
+</script>
+</body>
+</html>
